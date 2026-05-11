@@ -1,0 +1,11 @@
+*.class
+*.log
+*.tmp
+*.csv
+out/
+output/
+results/
+reports/
+.idea/
+.vscode/
+.DS_Store
