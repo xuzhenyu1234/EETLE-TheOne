@@ -1,0 +1,43 @@
+Scenario.name = EETLEEnvAttack60
+Scenario.endTime = 2000
+Scenario.updateInterval = 10.0
+Scenario.nrofHostGroups = 1
+
+Group.movementModel = RandomWaypoint
+Group.router = EETLERouter
+Group.nrofHosts = 60
+Group.bufferSize = 5M
+Group.waitTime = 0, 10
+Group.speed = 5, 20
+Group.nrofInterfaces = 1
+Group.interface1 = btInterface
+Group.msgTtl = 300
+Group1.groupID = n
+
+btInterface.transmitRange = 500
+btInterface.transmitSpeed = 250k
+
+MovementModel.worldSize = 1000, 1000
+MovementModel.warmup = 100
+MovementModel.rngSeed = 1
+
+Events.nrof = 1
+Events1.class = MessageEventGenerator
+Events1.interval = 5,10
+Events1.size = 1k,10k
+Events1.hosts = 0,19
+Events1.prefix = M
+
+EETLERouter.trustThreshold = 0.45
+EETLERouter.envCamouflageThreshold = 0.20
+EETLERouter.envCamouflageOutageBoost = 0.25
+
+Report.nrofReports = 3
+Report.report1 = MessageStatsReport
+Report.report2 = TrustReport
+Report.report3 = EETLETrustReport
+Report.reportDir = reports/eetle_env_attack_60/
+Report.prefix = EETLEEnvAttack60
+Report.warmup = 0
+TrustReport.interval = 100.0
+EETLETrustReport.interval = 100.0

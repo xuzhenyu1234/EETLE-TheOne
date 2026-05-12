@@ -8,6 +8,7 @@ import java.util.List;
 import routing.EETLERouter;
 import routing.MessageRouter;
 import trust.AttackType;
+import trust.TrustVector;
 
 import core.DTNHost;
 import core.Settings;
@@ -18,9 +19,12 @@ import core.UpdateListener;
  */
 public class EETLETrustReport extends Report implements UpdateListener {
 	private static final String HEADER =
-			"time,node,attackType,totalAttackAttempts,droppedByAttack," +
+			"time,node,attackType,homeRegion,currentRegion," +
+			"totalAttackAttempts,droppedByAttack," +
 			"blackholeDrops,onOffDrops,envCamouflageDrops,crossRegionDrops," +
-			"falseEventsInjected,falseEventCount";
+			"falseEventsInjected,falseEventCount,debugSelfScalarTrust," +
+			"debugSelfBelief," +
+			"envUncertainty,cognitiveUncertainty,disbelief";
 	private static final double DEFAULT_INTERVAL = 100.0;
 
 	private double lastReportTime = -1.0;
@@ -62,9 +66,12 @@ public class EETLETrustReport extends Report implements UpdateListener {
 
 			EETLERouter eetle = (EETLERouter)router;
 			AttackType type = eetle.getAttackType();
+			TrustVector vector = eetle.getDebugSelfTrustVector();
 			String line = format(getSimTime()) + "," +
 					host.toString() + "," +
 					type.toString() + "," +
+					eetle.getHomeRegion() + "," +
+					eetle.getCurrentRegion() + "," +
 					eetle.getAttackAttempts() + "," +
 					eetle.getDroppedByAttack() + "," +
 					eetle.getBlackholeDrops() + "," +
@@ -72,7 +79,12 @@ public class EETLETrustReport extends Report implements UpdateListener {
 					eetle.getEnvCamouflageDrops() + "," +
 					eetle.getCrossRegionDrops() + "," +
 					eetle.getFalseEventsInjected() + "," +
-					eetle.getFalseEventCount();
+					eetle.getFalseEventCount() + "," +
+					format(eetle.getDebugSelfScalarTrust()) + "," +
+					format(vector.getBelief()) + "," +
+					format(vector.getEnvUncertainty()) + "," +
+					format(vector.getCognitiveUncertainty()) + "," +
+					format(vector.getDisbelief());
 			write(line);
 		}
 	}

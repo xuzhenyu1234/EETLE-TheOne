@@ -23,7 +23,8 @@ import core.UpdateListener;
 public class TrustReport extends Report implements UpdateListener {
 	private static final String HEADER =
 			"time,evaluator,target,b,e,u,d,scalarTrust,successCount," +
-			"failCount,pout";
+			"failCount,uncertainForwardCount,pout,lastUpdateTime," +
+			"lastDecayFactor";
 	private static final double DEFAULT_INTERVAL = 100.0;
 
 	private double lastReportTime = -1.0;
@@ -83,9 +84,12 @@ public class TrustReport extends Report implements UpdateListener {
 				format(v.u) + "," +
 				format(v.d) + "," +
 				format(edge.scalarTrust) + "," +
-				edge.successCount + "," +
-				edge.failCount + "," +
-				format(edge.lastPout);
+				format(edge.successCount) + "," +
+				format(edge.failCount) + "," +
+				format(edge.uncertainForwardCount) + "," +
+				format(edge.lastPout) + "," +
+				format(edge.lastUpdateTime) + "," +
+				format(edge.lastDecayFactor);
 
 		write(line);
 	}

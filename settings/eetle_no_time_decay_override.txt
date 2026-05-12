@@ -1,0 +1,3 @@
+Scenario.name = EETLEAttack60NoDecay
+EETLERouter.baseDecayRate = 0.0
+Report.reportDir = reports/eetle_attack_60_no_decay/
