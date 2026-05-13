@@ -21,7 +21,8 @@ import core.UpdateListener;
 public class GlobalTrustReport extends Report implements UpdateListener {
 	private static final String HEADER =
 			"time,leader,target,globalTrust,b,e,u,d,recommendationCount," +
-			"lastUpdateTime";
+			"lastUpdateTime,avgAttentionWeight,avgRecommendationConsistency," +
+			"avgSpatialCorrelation";
 	private static final int DEFAULT_LEADER_ADDRESS = 0;
 	private static final double DEFAULT_INTERVAL = 100.0;
 
@@ -72,7 +73,10 @@ public class GlobalTrustReport extends Report implements UpdateListener {
 					format(entry.getFusedCognitiveUncertainty()) + "," +
 					format(entry.getFusedDisbelief()) + "," +
 					entry.getRecommendationCount() + "," +
-					format(entry.getLastUpdateTime());
+					format(entry.getLastUpdateTime()) + "," +
+					format(entry.getAverageAttentionWeight()) + "," +
+					format(entry.getAverageRecommendationConsistency()) + "," +
+					format(entry.getAverageSpatialCorrelation());
 			write(line);
 		}
 	}

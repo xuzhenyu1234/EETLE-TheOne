@@ -46,6 +46,13 @@ public class LeaderElection {
 
 	public void updateElection(GlobalTrustManager globalTrustManager,
 			RegionManager regionManager, double now) {
+		updateElection(globalTrustManager, regionManager, null, null, now);
+	}
+
+	public void updateElection(GlobalTrustManager globalTrustManager,
+			RegionManager regionManager,
+			MaliciousDetectionPolicy detectionPolicy,
+			Collection<TrustEdge> trustEdges, double now) {
 		if (globalTrustManager == null || regionManager == null) {
 			return;
 		}
@@ -59,7 +66,7 @@ public class LeaderElection {
 
 		for (GlobalTrustEntry entry : entries) {
 			LeaderCandidate candidate = buildCandidate(entry, regionManager,
-					leaderRegion, now);
+					leaderRegion, detectionPolicy, trustEdges, now);
 			candidates.add(candidate);
 		}
 
@@ -73,7 +80,10 @@ public class LeaderElection {
 				leaderRegion, now);
 
 		if (best == null) {
-			this.lastSwitchReason = "NO_ELIGIBLE_CANDIDATE";
+			this.lastSwitchReason =
+					isDetectedMalicious(current) ?
+					"LEADER_DETECTED_MALICIOUS_REELECTION" :
+					"NO_ELIGIBLE_CANDIDATE";
 			if (current != null) {
 				this.currentLeaderScore = current.getFinalScore();
 			}
@@ -87,11 +97,16 @@ public class LeaderElection {
 
 		if (abnormal) {
 			if (best.getAddress() != this.currentLeaderAddress) {
-				switchLeader(best, "ABNORMAL_REELECTION");
+				String reason = isDetectedMalicious(current) ?
+						"LEADER_DETECTED_MALICIOUS_REELECTION" :
+						"ABNORMAL_REELECTION";
+				switchLeader(best, reason);
 			}
 			else {
 				this.currentLeaderScore = best.getFinalScore();
-				this.lastSwitchReason = "ABNORMAL_REELECTION";
+				this.lastSwitchReason = isDetectedMalicious(current) ?
+						"LEADER_DETECTED_MALICIOUS_REELECTION" :
+						"ABNORMAL_REELECTION";
 			}
 			return;
 		}
@@ -110,7 +125,9 @@ public class LeaderElection {
 	}
 
 	private LeaderCandidate buildCandidate(GlobalTrustEntry entry,
-			RegionManager regionManager, int leaderRegion, double now) {
+			RegionManager regionManager, int leaderRegion,
+			MaliciousDetectionPolicy detectionPolicy,
+			Collection<TrustEdge> trustEdges, double now) {
 		int address = entry.getTargetAddress();
 		double globalTrust = clamp(entry.getGlobalTrust());
 		addTrustHistory(address, globalTrust);
@@ -141,12 +158,33 @@ public class LeaderElection {
 		candidate.setBaseScore(clamp(baseScore));
 		candidate.setFinalScore(clamp(candidate.getBaseScore() *
 				candidate.getRegionConstraintFactor()));
+		if (detectionPolicy != null) {
+			MaliciousDetectionResult result =
+					detectionPolicy.detectForLeaderCandidate(
+							address, globalTrust, trustEdges);
+			candidate.setPredictedMalicious(
+					result.isPredictedMalicious());
+			candidate.setEnvCamouflageRisk(
+					result.getEnvCamouflageRisk());
+			candidate.setTotalFailureCount(
+					result.getTotalFailureCount());
+			candidate.setLeaderDetectionThreshold(
+					result.getDetectionThreshold());
+			candidate.setLeaderEnvRiskThreshold(
+					result.getEnvRiskThreshold());
+			candidate.setDetectionReason(result.getReason());
+		}
 		applyEligibility(candidate, regionManager, leaderRegion, now);
 		return candidate;
 	}
 
 	private void applyEligibility(LeaderCandidate candidate,
 			RegionManager regionManager, int leaderRegion, double now) {
+		if (candidate.isPredictedMalicious()) {
+			candidate.setEligible(false);
+			candidate.setRejectReason("LEADER_DETECTED_MALICIOUS");
+			return;
+		}
 		if (candidate.getGlobalTrust() < this.candidateTrustThreshold) {
 			candidate.setEligible(false);
 			candidate.setRejectReason("LOW_GLOBAL_TRUST");
@@ -177,6 +215,9 @@ public class LeaderElection {
 	private boolean isCurrentLeaderAbnormal(LeaderCandidate current,
 			RegionManager regionManager, int leaderRegion, double now) {
 		if (current == null) {
+			return true;
+		}
+		if (current.isPredictedMalicious()) {
 			return true;
 		}
 		if (current.getGlobalTrust() < this.abnormalTrustThreshold) {
@@ -220,6 +261,10 @@ public class LeaderElection {
 		return null;
 	}
 
+	private boolean isDetectedMalicious(LeaderCandidate candidate) {
+		return candidate != null && candidate.isPredictedMalicious();
+	}
+
 	private void switchLeader(LeaderCandidate candidate, String reason) {
 		if (candidate.getAddress() != this.currentLeaderAddress) {
 			this.leaderChangeCount++;
@@ -260,8 +305,7 @@ public class LeaderElection {
 			variance += diff * diff;
 		}
 		variance = variance / history.size();
-		double std = Math.sqrt(variance);
-		return clamp(1.0 / (1.0 + std));
+		return clamp(1.0 / (1.0 + variance));
 	}
 
 	private double clamp(double value) {

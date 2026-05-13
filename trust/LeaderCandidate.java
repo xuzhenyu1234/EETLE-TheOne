@@ -13,6 +13,12 @@ public class LeaderCandidate {
 	private double finalScore;
 	private boolean eligible;
 	private String rejectReason;
+	private boolean predictedMalicious;
+	private double envCamouflageRisk;
+	private double totalFailureCount;
+	private double leaderDetectionThreshold;
+	private double leaderEnvRiskThreshold;
+	private String detectionReason;
 
 	public LeaderCandidate() {
 		this.address = 0;
@@ -24,6 +30,12 @@ public class LeaderCandidate {
 		this.finalScore = 0.0;
 		this.eligible = false;
 		this.rejectReason = "";
+		this.predictedMalicious = false;
+		this.envCamouflageRisk = 0.0;
+		this.totalFailureCount = 0.0;
+		this.leaderDetectionThreshold = 0.0;
+		this.leaderEnvRiskThreshold = 0.0;
+		this.detectionReason = "NORMAL";
 	}
 
 	public int getAddress() { return this.address; }
@@ -61,5 +73,42 @@ public class LeaderCandidate {
 	public String getRejectReason() { return this.rejectReason; }
 	public void setRejectReason(String rejectReason) {
 		this.rejectReason = rejectReason;
+	}
+	public boolean isPredictedMalicious() {
+		return this.predictedMalicious;
+	}
+	public void setPredictedMalicious(boolean predictedMalicious) {
+		this.predictedMalicious = predictedMalicious;
+	}
+	public double getEnvCamouflageRisk() {
+		return this.envCamouflageRisk;
+	}
+	public void setEnvCamouflageRisk(double envCamouflageRisk) {
+		this.envCamouflageRisk = envCamouflageRisk;
+	}
+	public double getTotalFailureCount() {
+		return this.totalFailureCount;
+	}
+	public void setTotalFailureCount(double totalFailureCount) {
+		this.totalFailureCount = totalFailureCount;
+	}
+	public double getLeaderDetectionThreshold() {
+		return this.leaderDetectionThreshold;
+	}
+	public void setLeaderDetectionThreshold(
+			double leaderDetectionThreshold) {
+		this.leaderDetectionThreshold = leaderDetectionThreshold;
+	}
+	public double getLeaderEnvRiskThreshold() {
+		return this.leaderEnvRiskThreshold;
+	}
+	public void setLeaderEnvRiskThreshold(double leaderEnvRiskThreshold) {
+		this.leaderEnvRiskThreshold = leaderEnvRiskThreshold;
+	}
+	public String getDetectionReason() {
+		return this.detectionReason;
+	}
+	public void setDetectionReason(String detectionReason) {
+		this.detectionReason = detectionReason;
 	}
 }

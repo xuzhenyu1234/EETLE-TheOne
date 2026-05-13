@@ -137,4 +137,52 @@ public class LinkEnvironmentModel {
 		}
 		return value;
 	}
+
+	public void setTransmitPower(double transmitPower) {
+		if (transmitPower > 0.0) {
+			this.transmitPower = transmitPower;
+		}
+	}
+
+	public void setNoisePower(double noisePower) {
+		if (noisePower >= 0.0) {
+			this.noisePower = noisePower;
+		}
+	}
+
+	public void setInterferencePower(double interferencePower) {
+		if (interferencePower >= 0.0) {
+			this.interferencePower = interferencePower;
+		}
+	}
+
+	public void setBandwidth(double bandwidth) {
+		if (bandwidth > 0.0) {
+			this.bandwidth = bandwidth;
+		}
+	}
+
+	public void setRequiredRate(double requiredRate) {
+		if (requiredRate >= 0.0) {
+			this.requiredRate = requiredRate;
+		}
+	}
+
+	public void setPathLossExponent(double pathLossExponent) {
+		if (pathLossExponent > 0.0) {
+			this.pathLossExponent = pathLossExponent;
+		}
+	}
+
+	public void setEpsilon(double epsilon) {
+		if (epsilon > 0.0) {
+			this.epsilon = epsilon;
+		}
+	}
+
+	public void setMinSamples(int minSamples) {
+		if (minSamples > 0) {
+			this.minSamples = minSamples;
+		}
+	}
 }

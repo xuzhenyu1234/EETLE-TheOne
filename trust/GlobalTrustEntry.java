@@ -12,6 +12,9 @@ public class GlobalTrustEntry {
 	private double fusedCognitiveUncertainty;
 	private double fusedDisbelief;
 	private double fusedCommunicationQuality;
+	private double averageAttentionWeight;
+	private double averageRecommendationConsistency;
+	private double averageSpatialCorrelation;
 	private int recommendationCount;
 	private double lastUpdateTime;
 
@@ -23,6 +26,9 @@ public class GlobalTrustEntry {
 		this.fusedCognitiveUncertainty = 0.5;
 		this.fusedDisbelief = 0.0;
 		this.fusedCommunicationQuality = 0.5;
+		this.averageAttentionWeight = 0.0;
+		this.averageRecommendationConsistency = 1.0;
+		this.averageSpatialCorrelation = 1.0;
 		this.recommendationCount = 0;
 		this.lastUpdateTime = 0.0;
 	}
@@ -81,6 +87,32 @@ public class GlobalTrustEntry {
 
 	public void setFusedCommunicationQuality(double fusedCommunicationQuality) {
 		this.fusedCommunicationQuality = fusedCommunicationQuality;
+	}
+
+	public double getAverageAttentionWeight() {
+		return this.averageAttentionWeight;
+	}
+
+	public void setAverageAttentionWeight(double averageAttentionWeight) {
+		this.averageAttentionWeight = averageAttentionWeight;
+	}
+
+	public double getAverageRecommendationConsistency() {
+		return this.averageRecommendationConsistency;
+	}
+
+	public void setAverageRecommendationConsistency(
+			double averageRecommendationConsistency) {
+		this.averageRecommendationConsistency =
+				averageRecommendationConsistency;
+	}
+
+	public double getAverageSpatialCorrelation() {
+		return this.averageSpatialCorrelation;
+	}
+
+	public void setAverageSpatialCorrelation(double averageSpatialCorrelation) {
+		this.averageSpatialCorrelation = averageSpatialCorrelation;
 	}
 
 	public int getRecommendationCount() {

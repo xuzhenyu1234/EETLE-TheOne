@@ -15,6 +15,9 @@ public class EventTrustManager {
 	private double eventReward = 0.05;
 	private double eventPenalty = 0.15;
 	private double eventEvaluatorTrustThreshold = 0.55;
+	private double eventConsensusRadius = 300.0;
+	private double eventConsensusInterval = 120.0;
+	private int minEventConsensusReports = 3;
 	private int maxEventEvaluatorsPerReport = 10;
 
 	private Map<Integer, List<EventReport>> reportsByEvent;
@@ -38,11 +41,21 @@ public class EventTrustManager {
 	public EventConsensusResult computeConsensus(int eventId,
 			Collection<EventReport> reports,
 			GlobalTrustManager globalTrustManager) {
+		return computeConsensus(eventId, null, reports, 0.0,
+				globalTrustManager);
+	}
+
+	public EventConsensusResult computeConsensus(int eventId,
+			EventReport targetReport, Collection<EventReport> reports,
+			double currentTime, GlobalTrustManager globalTrustManager) {
 		double weightedState = 0.0;
 		double weightSum = 0.0;
 		int count = 0;
 
 		for (EventReport report : reports) {
+			if (!isConsensusCandidate(targetReport, report, currentTime)) {
+				continue;
+			}
 			double weight = 0.5;
 			if (globalTrustManager != null) {
 				weight = globalTrustManager.getGlobalTrust(
@@ -61,7 +74,11 @@ public class EventTrustManager {
 		result.setReportCount(count);
 		result.setAgreementScore(Math.abs(probability - 0.5) * 2.0);
 
-		if (probability >= this.eventPositiveThreshold) {
+		if (count < this.minEventConsensusReports) {
+			result.setConsensusState(-1);
+			result.setUncertain(true);
+		}
+		else if (probability >= this.eventPositiveThreshold) {
 			result.setConsensusState(1);
 			result.setUncertain(false);
 		}
@@ -76,6 +93,39 @@ public class EventTrustManager {
 		return result;
 	}
 
+	private boolean isConsensusCandidate(EventReport targetReport,
+			EventReport candidate, double currentTime) {
+		if (candidate == null) {
+			return false;
+		}
+		if (targetReport == null) {
+			return true;
+		}
+		if (candidate.getReporterAddress() ==
+				targetReport.getReporterAddress()) {
+			return false;
+		}
+		if (Math.abs(candidate.getTimestamp() -
+				targetReport.getTimestamp()) > this.eventConsensusInterval) {
+			return false;
+		}
+		if (currentTime > 0.0 &&
+				Math.abs(currentTime - candidate.getTimestamp()) >
+				this.eventConsensusInterval) {
+			return false;
+		}
+		if (candidate.getRegion() == targetReport.getRegion()) {
+			return true;
+		}
+		return distance(candidate, targetReport) <= this.eventConsensusRadius;
+	}
+
+	private double distance(EventReport a, EventReport b) {
+		double dx = a.getX() - b.getX();
+		double dy = a.getY() - b.getY();
+		return Math.sqrt(dx * dx + dy * dy);
+	}
+
 	public List<EventTrustResult> evaluateReports(int evaluatorAddress,
 			double currentTime, GlobalTrustManager globalTrustManager) {
 		List<EventTrustResult> results = new ArrayList<EventTrustResult>();
@@ -88,12 +138,11 @@ public class EventTrustManager {
 				continue;
 			}
 
-			EventConsensusResult consensus = computeConsensus(eventId, reports,
-					globalTrustManager);
-			consensus.setTimestamp(currentTime);
-
 			for (int i = 0; i < reports.size(); i++) {
 				EventReport report = reports.get(i);
+				EventConsensusResult consensus = computeConsensus(eventId,
+						report, reports, currentTime, globalTrustManager);
+				consensus.setTimestamp(currentTime);
 				List<Integer> evaluators = selectEventEvaluators(
 						evaluatorAddress, report, reports, consensus,
 						globalTrustManager);
@@ -242,6 +291,33 @@ public class EventTrustManager {
 
 	public void setEventPenalty(double penalty) {
 		this.eventPenalty = penalty;
+	}
+
+	public void setEventConsensusRadius(double radius) {
+		if (radius < 0.0) {
+			this.eventConsensusRadius = 0.0;
+		}
+		else {
+			this.eventConsensusRadius = radius;
+		}
+	}
+
+	public void setEventConsensusInterval(double interval) {
+		if (interval < 0.0) {
+			this.eventConsensusInterval = 0.0;
+		}
+		else {
+			this.eventConsensusInterval = interval;
+		}
+	}
+
+	public void setMinEventConsensusReports(int minReports) {
+		if (minReports < 1) {
+			this.minEventConsensusReports = 1;
+		}
+		else {
+			this.minEventConsensusReports = minReports;
+		}
 	}
 
 	public void setEventEvaluatorTrustThreshold(double threshold) {

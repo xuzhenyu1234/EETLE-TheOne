@@ -5,9 +5,11 @@ package routing;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 
 import trust.AttackModel;
 import trust.AttackProfile;
@@ -21,6 +23,7 @@ import trust.GlobalTrustManager;
 import trust.LeaderElection;
 import trust.LinkEnvironmentModel;
 import trust.LocalTrustRecord;
+import trust.MaliciousDetectionPolicy;
 import trust.RegionManager;
 import trust.TrustEdge;
 import trust.TrustManager;
@@ -58,8 +61,15 @@ public class EETLERouter extends ActiveRouter {
 	public static final String EVENT_PENALTY_SETTING = "eventPenalty";
 	public static final String EVENT_EVALUATOR_TRUST_THRESHOLD_SETTING =
 			"eventEvaluatorTrustThreshold";
+	public static final String EVENT_CONSENSUS_RADIUS_SETTING =
+			"eventConsensusRadius";
+	public static final String MIN_EVENT_CONSENSUS_REPORTS_SETTING =
+			"minEventConsensusReports";
 	public static final String MAX_EVENT_EVALUATORS_PER_REPORT_SETTING =
 			"maxEventEvaluatorsPerReport";
+	public static final String SPATIAL_SCALE_SETTING = "spatialScale";
+	public static final String SPATIAL_REGION_DISCOUNT_SETTING =
+			"spatialRegionDiscount";
 	public static final String REGION_SPLIT_X_SETTING = "regionSplitX";
 	public static final String CROSS_REGION_WARMUP_SETTING =
 			"crossRegionWarmup";
@@ -118,6 +128,17 @@ public class EETLERouter extends ActiveRouter {
 	public static final String SCALAR_WEIGHT_C_SETTING = "scalarWeightC";
 	public static final String SCALAR_WEIGHT_E_SETTING = "scalarWeightE";
 	public static final String SCALAR_WEIGHT_D_SETTING = "scalarWeightD";
+	public static final String LINK_TRANSMIT_POWER_SETTING =
+			"linkTransmitPower";
+	public static final String LINK_NOISE_POWER_SETTING = "linkNoisePower";
+	public static final String LINK_INTERFERENCE_POWER_SETTING =
+			"linkInterferencePower";
+	public static final String LINK_BANDWIDTH_SETTING = "linkBandwidth";
+	public static final String LINK_REQUIRED_RATE_SETTING = "linkRequiredRate";
+	public static final String LINK_PATH_LOSS_EXPONENT_SETTING =
+			"linkPathLossExponent";
+	public static final String LINK_EPSILON_SETTING = "linkEpsilon";
+	public static final String LINK_MIN_SAMPLES_SETTING = "linkMinSamples";
 	private static final String EETLE_NS = "EETLERouter";
 	private static final int DEFAULT_LEADER_ADDRESS = 0;
 	private static final double LOCAL_TRUST_UPLOAD_INTERVAL = 120.0;
@@ -130,8 +151,12 @@ public class EETLERouter extends ActiveRouter {
 	private static RegionManager regionManager = new RegionManager();
 	private static LeaderElection leaderElection = new LeaderElection();
 	private static AttackModel attackModel = new AttackModel();
+	private static MaliciousDetectionPolicy maliciousDetectionPolicy =
+			new MaliciousDetectionPolicy();
 	private static Map<Integer, EETLERouter> routerByAddress =
 			new HashMap<Integer, EETLERouter>();
+	private static List<String> attackRecords = new ArrayList<String>();
+	private static Set<String> attackRecordKeys = new HashSet<String>();
 	private static double nextLeaderElectionTime = 0.0;
 
 	private TrustTable trustTable;
@@ -156,7 +181,11 @@ public class EETLERouter extends ActiveRouter {
 	private double eventReward = 0.05;
 	private double eventPenalty = 0.15;
 	private double eventEvaluatorTrustThreshold = 0.55;
+	private double eventConsensusRadius = 300.0;
+	private int minEventConsensusReports = 3;
 	private int maxEventEvaluatorsPerReport = 10;
+	private double spatialScale = 500.0;
+	private double spatialRegionDiscount = 0.5;
 	private boolean forceCrossRegionAttack = false;
 	private double crossRegionSwitchTime = 900.0;
 	private int eventTypeCount = 4;
@@ -209,7 +238,9 @@ public class EETLERouter extends ActiveRouter {
 		}
 		readScalarTrustSettings(eetleSettings);
 		readAblationSettings(eetleSettings);
+		readLinkEnvironmentSettings(eetleSettings);
 		attackModel.configure(eetleSettings);
+		maliciousDetectionPolicy.configure(eetleSettings);
 		if (eetleSettings.contains(ENV_CAMOUFLAGE_THRESHOLD_SETTING)) {
 			this.envCamouflageThreshold = eetleSettings.getDouble(
 					ENV_CAMOUFLAGE_THRESHOLD_SETTING);
@@ -236,6 +267,8 @@ public class EETLERouter extends ActiveRouter {
 		if (eetleSettings.contains(EVENT_CONSENSUS_INTERVAL_SETTING)) {
 			this.eventConsensusInterval = eetleSettings.getDouble(
 					EVENT_CONSENSUS_INTERVAL_SETTING);
+			eventTrustManager.setEventConsensusInterval(
+					this.eventConsensusInterval);
 		}
 		if (eetleSettings.contains(EVENT_POSITIVE_THRESHOLD_SETTING)) {
 			eventTrustManager.setEventPositiveThreshold(
@@ -262,12 +295,31 @@ public class EETLERouter extends ActiveRouter {
 			eventTrustManager.setEventEvaluatorTrustThreshold(
 					this.eventEvaluatorTrustThreshold);
 		}
+		if (eetleSettings.contains(EVENT_CONSENSUS_RADIUS_SETTING)) {
+			this.eventConsensusRadius = eetleSettings.getDouble(
+					EVENT_CONSENSUS_RADIUS_SETTING);
+		}
+		eventTrustManager.setEventConsensusRadius(
+				this.eventConsensusRadius);
+		if (eetleSettings.contains(MIN_EVENT_CONSENSUS_REPORTS_SETTING)) {
+			this.minEventConsensusReports = eetleSettings.getInt(
+					MIN_EVENT_CONSENSUS_REPORTS_SETTING);
+		}
+		eventTrustManager.setMinEventConsensusReports(
+				this.minEventConsensusReports);
 		if (eetleSettings.contains(
 				MAX_EVENT_EVALUATORS_PER_REPORT_SETTING)) {
 			this.maxEventEvaluatorsPerReport = eetleSettings.getInt(
 					MAX_EVENT_EVALUATORS_PER_REPORT_SETTING);
 			eventTrustManager.setMaxEventEvaluatorsPerReport(
 					this.maxEventEvaluatorsPerReport);
+		}
+		if (eetleSettings.contains(SPATIAL_SCALE_SETTING)) {
+			this.spatialScale = eetleSettings.getDouble(SPATIAL_SCALE_SETTING);
+		}
+		if (eetleSettings.contains(SPATIAL_REGION_DISCOUNT_SETTING)) {
+			this.spatialRegionDiscount = eetleSettings.getDouble(
+					SPATIAL_REGION_DISCOUNT_SETTING);
 		}
 		if (eetleSettings.contains(REGION_SPLIT_X_SETTING)) {
 			regionManager.setRegionSplitX(
@@ -298,11 +350,47 @@ public class EETLERouter extends ActiveRouter {
 		readLeaderElectionSettings(eetleSettings);
 	}
 
+	private void readLinkEnvironmentSettings(Settings settings) {
+		if (settings.contains(LINK_TRANSMIT_POWER_SETTING)) {
+			this.linkEnvironmentModel.setTransmitPower(
+					settings.getDouble(LINK_TRANSMIT_POWER_SETTING));
+		}
+		if (settings.contains(LINK_NOISE_POWER_SETTING)) {
+			this.linkEnvironmentModel.setNoisePower(
+					settings.getDouble(LINK_NOISE_POWER_SETTING));
+		}
+		if (settings.contains(LINK_INTERFERENCE_POWER_SETTING)) {
+			this.linkEnvironmentModel.setInterferencePower(
+					settings.getDouble(LINK_INTERFERENCE_POWER_SETTING));
+		}
+		if (settings.contains(LINK_BANDWIDTH_SETTING)) {
+			this.linkEnvironmentModel.setBandwidth(
+					settings.getDouble(LINK_BANDWIDTH_SETTING));
+		}
+		if (settings.contains(LINK_REQUIRED_RATE_SETTING)) {
+			this.linkEnvironmentModel.setRequiredRate(
+					settings.getDouble(LINK_REQUIRED_RATE_SETTING));
+		}
+		if (settings.contains(LINK_PATH_LOSS_EXPONENT_SETTING)) {
+			this.linkEnvironmentModel.setPathLossExponent(
+					settings.getDouble(LINK_PATH_LOSS_EXPONENT_SETTING));
+		}
+		if (settings.contains(LINK_EPSILON_SETTING)) {
+			this.linkEnvironmentModel.setEpsilon(
+					settings.getDouble(LINK_EPSILON_SETTING));
+		}
+		if (settings.contains(LINK_MIN_SAMPLES_SETTING)) {
+			this.linkEnvironmentModel.setMinSamples(
+					settings.getInt(LINK_MIN_SAMPLES_SETTING));
+		}
+	}
+
 	protected EETLERouter(EETLERouter r) {
 		super(r);
 		this.trustTable = new TrustTable();
 		this.trustManager = new TrustManager();
 		this.linkEnvironmentModel = new LinkEnvironmentModel();
+		readLinkEnvironmentSettings(new Settings(EETLE_NS));
 		this.attackProfile = new AttackProfile(r.attackProfile);
 		this.attackRng = new Random(1);
 		this.trustThreshold = r.trustThreshold;
@@ -315,7 +403,11 @@ public class EETLERouter extends ActiveRouter {
 		this.eventReward = r.eventReward;
 		this.eventPenalty = r.eventPenalty;
 		this.eventEvaluatorTrustThreshold = r.eventEvaluatorTrustThreshold;
+		this.eventConsensusRadius = r.eventConsensusRadius;
+		this.minEventConsensusReports = r.minEventConsensusReports;
 		this.maxEventEvaluatorsPerReport = r.maxEventEvaluatorsPerReport;
+		this.spatialScale = r.spatialScale;
+		this.spatialRegionDiscount = r.spatialRegionDiscount;
 		this.forceCrossRegionAttack = r.forceCrossRegionAttack;
 		this.crossRegionSwitchTime = r.crossRegionSwitchTime;
 		this.trustManager.setBaseDecayRate(this.baseDecayRate);
@@ -343,6 +435,12 @@ public class EETLERouter extends ActiveRouter {
 				this.enableLeaderSwitchMargin);
 		eventTrustManager.setEventEvaluatorTrustThreshold(
 				this.eventEvaluatorTrustThreshold);
+		eventTrustManager.setEventConsensusInterval(
+				this.eventConsensusInterval);
+		eventTrustManager.setEventConsensusRadius(
+				this.eventConsensusRadius);
+		eventTrustManager.setMinEventConsensusReports(
+				this.minEventConsensusReports);
 		eventTrustManager.setMaxEventEvaluatorsPerReport(
 				this.maxEventEvaluatorsPerReport);
 		this.homeRegion = null;
@@ -509,15 +607,27 @@ public class EETLERouter extends ActiveRouter {
 					getHost().getAddress(), SimClock.getTime()));
 			if (type == AttackType.BLACKHOLE) {
 				this.blackholeDrops++;
+				logAttackAction("BLACKHOLE_DROP", getHost().getAddress(),
+						getAttackTargetAddress(message), message.getId(),
+						pout);
 			}
 			else if (type == AttackType.ON_OFF) {
 				this.onOffDrops++;
+				logAttackAction("ON_OFF_DROP", getHost().getAddress(),
+						getAttackTargetAddress(message), message.getId(),
+						pout);
 			}
 			else if (type == AttackType.ENV_CAMOUFLAGE) {
 				this.envCamouflageDrops++;
+				logAttackAction("ENV_CAMOUFLAGE_DROP",
+						getHost().getAddress(), getAttackTargetAddress(message),
+						message.getId(), pout);
 			}
 			else if (type == AttackType.CROSS_REGION) {
 				this.crossRegionDrops++;
+				logAttackAction("CROSS_REGION_DROP",
+						getHost().getAddress(), getAttackTargetAddress(message),
+						message.getId(), pout);
 			}
 		}
 
@@ -582,6 +692,13 @@ public class EETLERouter extends ActiveRouter {
 		report.setY(getHost().getLocation().getY());
 		report.setRegion(regionManager.getCurrentRegion(getHost().getAddress()));
 		eventTrustManager.collectEventReport(report);
+		if (reportedState != realState) {
+			String action = this.attackProfile.getType() ==
+					AttackType.ENV_CAMOUFLAGE ?
+					"ENV_CAMOUFLAGE_FALSE_EVENT" : "FALSE_EVENT_INJECT";
+			logAttackAction(action, report.getEventId(), report.getEventId(),
+					"event-" + report.getEventId(), linkOutageProbability);
+		}
 
 		return reportedState;
 	}
@@ -601,6 +718,11 @@ public class EETLERouter extends ActiveRouter {
 		this.falseEventsInjected++;
 		this.falseEventCount++;
 		this.attackAttempts++;
+		String action = this.attackProfile.getType() ==
+				AttackType.ENV_CAMOUFLAGE ?
+				"ENV_CAMOUFLAGE_FALSE_EVENT" : "FALSE_EVENT_INJECT";
+		logAttackAction(action, realEventType, realEventType, "eventType-" +
+				realEventType, linkOutageProbability);
 
 		int falseType = this.attackRng.nextInt(nrofEventTypes - 1);
 		if (falseType >= realEventType) {
@@ -814,14 +936,52 @@ public class EETLERouter extends ActiveRouter {
 			LocalTrustRecord record = new LocalTrustRecord(
 					getHost().getAddress(), targetAddress, edge.vector,
 					edge.scalarTrust, edge.lastPout, now);
-			record.setRecommendationConsistency(1.0);
-			record.setCommunicationQuality(clamp(1.0 - edge.lastPout));
-			record.setSpatialCorrelation(1.0);
+			record.setCommunicationQuality(
+					calculateLeaderCommunicationQuality(edge));
+			record.setSpatialCorrelation(
+					calculateSpatialCorrelation(targetAddress));
 			record.setAttentionWeight(0.0);
 
 			globalTrustManager.collectLocalTrust(record);
 		}
 		globalTrustManager.updateGlobalTrust(DEFAULT_LEADER_ADDRESS, now);
+	}
+
+	private double calculateLeaderCommunicationQuality(TrustEdge edge) {
+		int leaderAddress = getCurrentLeaderAddress();
+		EETLERouter leaderRouter = routerByAddress.get(
+				new Integer(leaderAddress));
+		if (leaderRouter == null || leaderRouter.getHost() == null ||
+				getHost() == null) {
+			return clamp(1.0 - edge.lastPout);
+		}
+
+		double leaderPout = leaderRouter.calculatePout(
+				leaderRouter.getHost(), getHost());
+		return clamp(1.0 - leaderPout);
+	}
+
+	private double calculateSpatialCorrelation(int targetAddress) {
+		EETLERouter targetRouter = routerByAddress.get(
+				new Integer(targetAddress));
+		if (targetRouter == null || targetRouter.getHost() == null ||
+				getHost() == null) {
+			return 1.0;
+		}
+
+		double distance = getHost().getLocation().distance(
+				targetRouter.getHost().getLocation());
+		double scale = this.spatialScale <= 0.0 ? 500.0 : this.spatialScale;
+		double spatial = Math.exp(-distance / scale);
+
+		int evaluatorRegion = regionManager.getCurrentRegion(
+				getHost().getAddress());
+		int targetRegion = regionManager.getCurrentRegion(targetAddress);
+		if (evaluatorRegion >= 0 && targetRegion >= 0 &&
+				evaluatorRegion != targetRegion) {
+			spatial *= this.spatialRegionDiscount;
+		}
+		return clamp(spatial);
 	}
 
 	/**
@@ -877,7 +1037,8 @@ public class EETLERouter extends ActiveRouter {
 			return;
 		}
 		nextLeaderElectionTime = now + this.leaderElectionInterval;
-		leaderElection.updateElection(globalTrustManager, regionManager, now);
+		leaderElection.updateElection(globalTrustManager, regionManager,
+				maliciousDetectionPolicy, getAllTrustEdgesSnapshot(), now);
 	}
 
 	/**
@@ -897,6 +1058,21 @@ public class EETLERouter extends ActiveRouter {
 
 	public static LeaderElection getLeaderElection() {
 		return leaderElection;
+	}
+
+	public static MaliciousDetectionPolicy getMaliciousDetectionPolicy() {
+		return maliciousDetectionPolicy;
+	}
+
+	public static List<TrustEdge> getAllTrustEdgesSnapshot() {
+		List<TrustEdge> edges = new ArrayList<TrustEdge>();
+		for (EETLERouter router : routerByAddress.values()) {
+			if (router == null || router.trustTable == null) {
+				continue;
+			}
+			edges.addAll(router.trustTable.getAllEdgesAsCollection());
+		}
+		return edges;
 	}
 
 	public static int getCurrentLeaderAddress() {
@@ -976,7 +1152,74 @@ public class EETLERouter extends ActiveRouter {
 
 	@Override
 	protected void transferAborted(Connection con) {
+		Message message = con.getMessage();
+		DTNHost from = getHost();
+		DTNHost to = con.getOtherNode(from);
+
+		if (message != null && from != null && to != null &&
+				from.getAddress() != to.getAddress()) {
+			double pout = calculatePout(from, to);
+			if (pout > this.envCamouflageThreshold) {
+				applyObservedUncertainForwardResult(to.getAddress(), pout);
+			}
+			else {
+				applyObservedForwardResult(to.getAddress(), false, pout);
+			}
+		}
 		super.transferAborted(con);
+	}
+
+	private int getAttackTargetAddress(Message message) {
+		if (message == null || message.getTo() == null) {
+			return -1;
+		}
+		return message.getTo().getAddress();
+	}
+
+	private void logAttackAction(String action, int keyAddress,
+			int targetAddress,
+			String messageId, double pout) {
+		String key = getHost().getAddress() + "|" + action + "|" +
+				keyAddress + "|" + messageId;
+		synchronized (attackRecords) {
+			if (attackRecordKeys.contains(key)) {
+				return;
+			}
+			attackRecordKeys.add(key);
+		}
+
+		AttackType type = this.attackProfile.getType();
+		String line = formatAttackDouble(SimClock.getTime()) + "," +
+				getHost().getAddress() + "," +
+				type.toString() + "," +
+				action + "," +
+				targetAddress + "," +
+				messageId + "," +
+				formatAttackDouble(clamp(pout)) + "," +
+				getHomeRegion() + "," +
+				getCurrentRegion() + "," +
+				isCrossRegion();
+		synchronized (attackRecords) {
+			attackRecords.add(line);
+		}
+	}
+
+	private static String formatAttackDouble(double value) {
+		return String.format(java.util.Locale.US, "%.4f", value);
+	}
+
+	public static List<String> getAttackRecords() {
+		synchronized (attackRecords) {
+			return new ArrayList<String>(attackRecords);
+		}
+	}
+
+	public static List<String> drainAttackRecords() {
+		synchronized (attackRecords) {
+			List<String> drained = attackRecords;
+			attackRecords = new ArrayList<String>();
+			return drained;
+		}
 	}
 
 	public TrustTable getTrustTable() {

@@ -24,7 +24,9 @@ public class LeaderReport extends Report implements UpdateListener {
 			"time,recordType,currentLeader,node,attackType,globalTrust," +
 			"trustStability,communicationQuality,regionConstraintFactor," +
 			"baseScore,finalScore,eligible,rejectReason,isCurrentLeader," +
-			"leaderChangeCount,lastSwitchReason";
+			"leaderChangeCount,lastSwitchReason,predictedMalicious," +
+			"envCamouflageRisk,detectionReason,leaderDetectionThreshold," +
+			"leaderEnvRiskThreshold,totalFailureCount";
 	private static final double DEFAULT_INTERVAL = 100.0;
 
 	private double lastReportTime = -1.0;
@@ -62,6 +64,9 @@ public class LeaderReport extends Report implements UpdateListener {
 
 		Map<Integer, String> attackTypes = getAttackTypes(hosts);
 		int currentLeader = election.getCurrentLeaderAddress();
+		List<LeaderCandidate> candidates = election.getLastCandidates();
+		LeaderCandidate leaderCandidate = findCandidate(candidates,
+				currentLeader);
 
 		write(format(getSimTime()) + ",LEADER," +
 				currentLeader + "," +
@@ -72,9 +77,14 @@ public class LeaderReport extends Report implements UpdateListener {
 				",," +
 				"true," +
 				election.getLeaderChangeCount() + "," +
-				election.getLastSwitchReason());
+				election.getLastSwitchReason() + "," +
+				getPredictedMalicious(leaderCandidate) + "," +
+				format(getEnvCamouflageRisk(leaderCandidate)) + "," +
+				getDetectionReason(leaderCandidate) + "," +
+				format(getLeaderDetectionThreshold(leaderCandidate)) + "," +
+				format(getLeaderEnvRiskThreshold(leaderCandidate)) + "," +
+				format(getTotalFailureCount(leaderCandidate)));
 
-		List<LeaderCandidate> candidates = election.getLastCandidates();
 		for (int i = 0; i < candidates.size(); i++) {
 			LeaderCandidate c = candidates.get(i);
 			boolean isCurrentLeader = c.getAddress() == currentLeader;
@@ -92,8 +102,64 @@ public class LeaderReport extends Report implements UpdateListener {
 					c.getRejectReason() + "," +
 					isCurrentLeader + "," +
 					election.getLeaderChangeCount() + "," +
-					election.getLastSwitchReason());
+					election.getLastSwitchReason() + "," +
+					c.isPredictedMalicious() + "," +
+					format(c.getEnvCamouflageRisk()) + "," +
+					c.getDetectionReason() + "," +
+					format(c.getLeaderDetectionThreshold()) + "," +
+					format(c.getLeaderEnvRiskThreshold()) + "," +
+					format(c.getTotalFailureCount()));
 		}
+	}
+
+	private LeaderCandidate findCandidate(List<LeaderCandidate> candidates,
+			int address) {
+		for (int i = 0; i < candidates.size(); i++) {
+			LeaderCandidate c = candidates.get(i);
+			if (c.getAddress() == address) {
+				return c;
+			}
+		}
+		return null;
+	}
+
+	private boolean getPredictedMalicious(LeaderCandidate candidate) {
+		return candidate != null && candidate.isPredictedMalicious();
+	}
+
+	private double getEnvCamouflageRisk(LeaderCandidate candidate) {
+		if (candidate == null) {
+			return 0.0;
+		}
+		return candidate.getEnvCamouflageRisk();
+	}
+
+	private String getDetectionReason(LeaderCandidate candidate) {
+		if (candidate == null) {
+			return "UNKNOWN";
+		}
+		return candidate.getDetectionReason();
+	}
+
+	private double getLeaderDetectionThreshold(LeaderCandidate candidate) {
+		if (candidate == null) {
+			return 0.0;
+		}
+		return candidate.getLeaderDetectionThreshold();
+	}
+
+	private double getLeaderEnvRiskThreshold(LeaderCandidate candidate) {
+		if (candidate == null) {
+			return 0.0;
+		}
+		return candidate.getLeaderEnvRiskThreshold();
+	}
+
+	private double getTotalFailureCount(LeaderCandidate candidate) {
+		if (candidate == null) {
+			return 0.0;
+		}
+		return candidate.getTotalFailureCount();
 	}
 
 	private Map<Integer, String> getAttackTypes(List<DTNHost> hosts) {

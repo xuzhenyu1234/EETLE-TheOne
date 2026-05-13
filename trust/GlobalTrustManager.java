@@ -37,12 +37,16 @@ public class GlobalTrustManager {
 
 	/* Current global trust entries after fusion */
 	private Map<Integer, GlobalTrustEntry> globalTrustEntries;
+	private Map<Integer, Double> recommendationDeviationSum;
+	private Map<Integer, Integer> recommendationDeviationCount;
 
 	public GlobalTrustManager() {
 		this.recordsByTarget =
 				new HashMap<Integer, Map<Integer, LocalTrustRecord>>();
 		this.previousGlobalTrust = new HashMap<Integer, Double>();
 		this.globalTrustEntries = new HashMap<Integer, GlobalTrustEntry>();
+		this.recommendationDeviationSum = new HashMap<Integer, Double>();
+		this.recommendationDeviationCount = new HashMap<Integer, Integer>();
 	}
 
 	/**
@@ -50,6 +54,7 @@ public class GlobalTrustManager {
 	 * Called by each EETLERouter periodically.
 	 */
 	public void collectLocalTrust(LocalTrustRecord record) {
+		updateRecommendationConsistency(record);
 		Integer key = new Integer(record.getTargetAddress());
 		Map<Integer, LocalTrustRecord> records = this.recordsByTarget.get(key);
 		if (records == null) {
@@ -57,6 +62,38 @@ public class GlobalTrustManager {
 			this.recordsByTarget.put(key, records);
 		}
 		records.put(new Integer(record.getEvaluatorAddress()), record);
+	}
+
+	/**
+	 * Recommendation consistency:
+	 * deviation_i,j = |LT_i,j - GT_j(t-1)|.
+	 * A_i = 1 / (1 + avgDeviation_i). If evaluator i has no previous
+	 * deviation history, A_i defaults to 1.0 for the first recommendation.
+	 */
+	private void updateRecommendationConsistency(LocalTrustRecord record) {
+		Integer evaluatorKey = new Integer(record.getEvaluatorAddress());
+		Double sumObj = this.recommendationDeviationSum.get(evaluatorKey);
+		Integer countObj = this.recommendationDeviationCount.get(evaluatorKey);
+		double sum = sumObj == null ? 0.0 : sumObj.doubleValue();
+		int count = countObj == null ? 0 : countObj.intValue();
+
+		if (count <= 0) {
+			record.setRecommendationConsistency(1.0);
+		}
+		else {
+			double avgDeviation = sum / count;
+			record.setRecommendationConsistency(clamp(
+					1.0 / (1.0 + avgDeviation)));
+		}
+
+		double previousTargetTrust =
+				getPreviousGlobalTrust(record.getTargetAddress());
+		double deviation = Math.abs(record.getScalarTrust() -
+				previousTargetTrust);
+		this.recommendationDeviationSum.put(evaluatorKey,
+				new Double(sum + deviation));
+		this.recommendationDeviationCount.put(evaluatorKey,
+				new Integer(count + 1));
 	}
 
 	/**
@@ -162,6 +199,9 @@ public class GlobalTrustManager {
 			double fusedD = 0.0;
 			double fusedScalar = 0.0;
 			double fusedCommunicationQuality = 0.0;
+			double averageAttentionWeight = 0.0;
+			double averageRecommendationConsistency = 0.0;
+			double averageSpatialCorrelation = 0.0;
 
 			for (int i = 0; i < records.size(); i++) {
 				LocalTrustRecord rec = records.get(i);
@@ -180,6 +220,10 @@ public class GlobalTrustManager {
 				fusedD += w * rec.getTrustVector().d;
 				fusedScalar += w * rec.getScalarTrust();
 				fusedCommunicationQuality += w * q;
+				averageAttentionWeight += w;
+				averageRecommendationConsistency +=
+						rec.getRecommendationConsistency();
+				averageSpatialCorrelation += rec.getSpatialCorrelation();
 			}
 
 			/* Normalize the four-dimensional vector */
@@ -202,6 +246,12 @@ public class GlobalTrustManager {
 			gtEntry.setFusedDisbelief(fusedVector.d);
 			gtEntry.setFusedCommunicationQuality(
 					clamp(fusedCommunicationQuality));
+			gtEntry.setAverageAttentionWeight(
+					clamp(averageAttentionWeight / records.size()));
+			gtEntry.setAverageRecommendationConsistency(clamp(
+					averageRecommendationConsistency / records.size()));
+			gtEntry.setAverageSpatialCorrelation(clamp(
+					averageSpatialCorrelation / records.size()));
 			gtEntry.normalizeVector();
 			gtEntry.setRecommendationCount(records.size());
 			gtEntry.setLastUpdateTime(currentTime);

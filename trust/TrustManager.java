@@ -215,6 +215,7 @@ public class TrustManager {
 		}
 		else {
 			edge.failCount += 1.0;
+			edge.totalFailureCount += 1.0;
 		}
 
 		double s = edge.successCount;
