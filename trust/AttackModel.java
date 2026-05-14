@@ -12,9 +12,10 @@ import core.Settings;
 /**
  * Configurable attack assignment model.
  *
- * The default addressRange mode preserves the original experiment layout:
- * 40-43 BLACKHOLE, 44-47 ON_OFF, 48-51 FALSE_EVENT,
- * 52-55 ENV_CAMOUFLAGE, and 56-59 CROSS_REGION.
+ * The default addressRange mode assigns the first 2/3 of node addresses as
+ * NORMAL and splits the remaining 1/3 evenly among the five attack types.
+ * This keeps address-based experiments deterministic for different node
+ * counts while placing CROSS_REGION attackers in the last address segment.
  */
 public class AttackModel {
 	public static final String MODE_ADDRESS_RANGE = "addressRange";
@@ -72,9 +73,11 @@ public class AttackModel {
 					settings.getSetting("attackAssignmentMode");
 		}
 
-		Settings groupSettings = new Settings("Group");
-		if (groupSettings.contains("nrofHosts")) {
-			this.hostCount = groupSettings.getInt("nrofHosts");
+		if (settings.contains("attackHostCount")) {
+			this.hostCount = settings.getInt("attackHostCount");
+		}
+		else {
+			this.hostCount = readHostCount();
 		}
 
 		this.profileByAddress.clear();
@@ -102,22 +105,64 @@ public class AttackModel {
 	}
 
 	private AttackType getAddressRangeAttackType(int address) {
-		if (address >= 40 && address <= 43) {
+		int attackCount = this.hostCount / 3;
+		int normalCount = this.hostCount - attackCount;
+		if (address < normalCount) {
+			return AttackType.NORMAL;
+		}
+
+		int[] counts = calculateTypeCounts(attackCount);
+		int start = normalCount;
+		int end = start + counts[0];
+		if (address >= start && address < end) {
 			return AttackType.BLACKHOLE;
 		}
-		if (address >= 44 && address <= 47) {
+		start = end;
+		end = start + counts[1];
+		if (address >= start && address < end) {
 			return AttackType.ON_OFF;
 		}
-		if (address >= 48 && address <= 51) {
+		start = end;
+		end = start + counts[2];
+		if (address >= start && address < end) {
 			return AttackType.FALSE_EVENT;
 		}
-		if (address >= 52 && address <= 55) {
+		start = end;
+		end = start + counts[3];
+		if (address >= start && address < end) {
 			return AttackType.ENV_CAMOUFLAGE;
 		}
-		if (address >= 56 && address <= 59) {
+		start = end;
+		end = start + counts[4];
+		if (address >= start && address < end) {
 			return AttackType.CROSS_REGION;
 		}
 		return AttackType.NORMAL;
+	}
+
+	private int readHostCount() {
+		Settings scenarioSettings = new Settings("Scenario");
+		if (scenarioSettings.contains("nrofHostGroups")) {
+			int groupCount = scenarioSettings.getInt("nrofHostGroups");
+			int total = 0;
+			for (int i = 1; i <= groupCount; i++) {
+				Settings numberedGroupSettings =
+						new Settings("Group" + i);
+				if (numberedGroupSettings.contains("nrofHosts")) {
+					total += numberedGroupSettings.getInt("nrofHosts");
+				}
+			}
+			if (total > 0) {
+				return total;
+			}
+		}
+
+		Settings groupSettings = new Settings("Group");
+		if (groupSettings.contains("nrofHosts")) {
+			return groupSettings.getInt("nrofHosts");
+		}
+
+		return this.hostCount;
 	}
 
 	private void ensureRandomAssignment() {
