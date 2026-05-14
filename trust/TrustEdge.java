@@ -10,13 +10,19 @@ public class TrustEdge {
 	private String evaluatorId;
 	private String targetId;
 
-	public int successCount;
-	public int failCount;
+	public double successCount;
+	public double failCount;
+	public double totalFailureCount;
 
 	public TrustVector vector;
 
 	public double scalarTrust;
 	public double lastUpdateTime;
+	public double lastDecayFactor;
+	public double trueEventCount;
+	public double falseEventCount;
+	public double uncertainEventCount;
+	public double uncertainForwardCount;
 
 	public int highEnvTotalCount;
 	public int highEnvFailureCount;
@@ -30,9 +36,15 @@ public class TrustEdge {
 		this.targetId = targetId;
 		this.successCount = 0;
 		this.failCount = 0;
+		this.totalFailureCount = 0;
 		this.vector = new TrustVector();
 		this.scalarTrust = 0.5;
 		this.lastUpdateTime = 0.0;
+		this.lastDecayFactor = 1.0;
+		this.trueEventCount = 0.0;
+		this.falseEventCount = 0.0;
+		this.uncertainEventCount = 0.0;
+		this.uncertainForwardCount = 0.0;
 		this.highEnvTotalCount = 0;
 		this.highEnvFailureCount = 0;
 		this.lastPout = 0.0;
@@ -47,8 +59,30 @@ public class TrustEdge {
 		return this.targetId;
 	}
 
-	public int getInteractionCount() {
+	public double getInteractionCount() {
 		return this.successCount + this.failCount;
+	}
+
+	public double getTotalFailureCount() {
+		return this.totalFailureCount;
+	}
+
+	public int getHighEnvFailureCount() {
+		return this.highEnvFailureCount;
+	}
+
+	public int getHighEnvTotalCount() {
+		return this.highEnvTotalCount;
+	}
+
+	public double getEnvCamouflageRisk() {
+		double failureDenominator = Math.max(1.0, this.totalFailureCount);
+		double highEnvDenominator = Math.max(1.0, this.highEnvTotalCount);
+		double failureConcentration =
+				this.highEnvFailureCount / failureDenominator;
+		double highEnvConcentration =
+				this.highEnvFailureCount / highEnvDenominator;
+		return Math.max(failureConcentration, highEnvConcentration);
 	}
 
 	public void addTrustHistory(double value) {

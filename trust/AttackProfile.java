@@ -122,4 +122,16 @@ public class AttackProfile {
 	public double getCrossRegionWarmup() {
 		return this.crossRegionWarmup;
 	}
+
+	public void setEnvAttackThreshold(double envAttackThreshold) {
+		if (envAttackThreshold < 0) {
+			this.envAttackThreshold = 0.0;
+		}
+		else if (envAttackThreshold > 1) {
+			this.envAttackThreshold = 1.0;
+		}
+		else {
+			this.envAttackThreshold = envAttackThreshold;
+		}
+	}
 }

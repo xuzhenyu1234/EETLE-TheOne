@@ -694,25 +694,27 @@ The local scalar trust value is calculated from the four-dimensional trust vecto
 
 Formula:
 
-LT_ij(t) = b / (b + lambdaD * d + lambdaE * e + lambdaU * u)
+LT_ij(t) = (b + alphaC * u + alphaE * e)
+           / (b + alphaC * u + alphaE * e + alphaD * d)
 
 Suggested default parameters:
 
-lambdaD = 0.7
+alphaC = 0.5
 
-lambdaE = 0.3
+alphaE = 0.3
 
-lambdaU = 0.2
+alphaD = 1.5
 
 Constraint:
 
-lambdaD >= lambdaE >= lambdaU >= 0
+0 <= alphaE <= alphaC <= 1, alphaD >= 1
 
 Interpretation:
 
-- Distrust should penalize trust most strongly.
-- Environmental uncertainty should penalize trust less than distrust.
-- Cognitive uncertainty should have the weakest penalty.
+- Cognitive uncertainty contributes cautiously to the trust numerator.
+- Environmental uncertainty contributes cautiously to the trust numerator.
+- Distrust remains an explicit denominator penalty and should be weighted
+  most strongly.
 
 If denominator <= 0:
 
@@ -821,7 +823,8 @@ normalize()
 
 Step 8: Compute scalar trust.
 
-LT = b / (b + lambdaD * d + lambdaE * e + lambdaU * u)
+LT = (b + alphaC * u + alphaE * e)
+     / (b + alphaC * u + alphaE * e + alphaD * d)
 
 If denominator <= 0:
 
